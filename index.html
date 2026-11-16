@@ -308,6 +308,8 @@
   </div>
 
   <script>
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwOcoMm55zlszwU49zEf1t2QyhCPv5NH908bf4NFvZ2LChiJeMMcPFZgoorDuHomtFOGA/exec';
+
     var currentUser = null;
     var currentPass = null;
     var userRole = null;
@@ -419,8 +421,9 @@
       var pass = document.getElementById('password-input').value.trim();
       document.getElementById('error-msg').innerText = currentLang === 'ar' ? 'جاري إرسال رمز التحقق...' : 'Sending verification code...';
 
-      google.script.run
-        .withSuccessHandler(function(response) {
+      fetch(SCRIPT_URL + '?q=requestOTP&user=' + encodeURIComponent(user) + '&pass=' + encodeURIComponent(pass))
+        .then(res => res.json())
+        .then(response => {
           if (response.success) {
             currentUser = user;
             currentPass = pass;
@@ -431,14 +434,17 @@
             document.getElementById('error-msg').innerText = response.message;
           }
         })
-        .requestOTP(user, pass);
+        .catch(err => {
+          document.getElementById('error-msg').innerText = 'Connection error / خطأ في الاتصال';
+        });
     }
 
     function verifyOTPCode() {
       var otp = document.getElementById('otp-input').value.trim();
 
-      google.script.run
-        .withSuccessHandler(function(response) {
+      fetch(SCRIPT_URL + '?q=verifyOTP&user=' + encodeURIComponent(currentUser) + '&otp=' + encodeURIComponent(otp))
+        .then(res => res.json())
+        .then(response => {
           if (response.success) {
             userRole = response.role;
             document.getElementById('login-screen').style.display = 'none';
@@ -448,7 +454,9 @@
             document.getElementById('error-msg').innerText = response.message;
           }
         })
-        .verifyOTP(currentUser, otp);
+        .catch(err => {
+          document.getElementById('error-msg').innerText = 'Connection error / خطأ في الاتصال';
+        });
     }
 
     function handleLogout() {
@@ -467,12 +475,12 @@
     }
 
     function loadData() {
-      google.script.run
-        .withSuccessHandler(function(data) {
+      fetch(SCRIPT_URL + '?q=getData')
+        .then(res => res.json())
+        .then(data => {
           cachedData = data;
           updateUI(data);
-        })
-        .getPaymentData();
+        });
     }
 
     function updateUI(data) {
@@ -529,16 +537,13 @@
     }
 
     function togglePayment(installmentNum, isPaid) {
-      google.script.run
-        .withSuccessHandler(function(data) {
+      fetch(SCRIPT_URL + '?q=updateStatus&user=' + encodeURIComponent(currentUser) + '&pass=' + encodeURIComponent(currentPass) + '&num=' + installmentNum + '&paid=' + isPaid)
+        .then(res => res.json())
+        .then(data => {
           cachedData = data;
           updateUI(data);
         })
-        .withFailureHandler(function(err) {
-          alert('Error: ' + err.message);
-          loadData();
-        })
-        .updateInstallmentStatus(currentUser, currentPass, installmentNum, isPaid);
+        .catch(err => alert('Error updating data'));
     }
   </script>
 </body>
