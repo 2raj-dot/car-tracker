@@ -68,6 +68,9 @@
       margin-top: 10px;
       font-size: 14px;
     }
+    #totp-section {
+      display: none;
+    }
     #app-screen {
       display: none;
     }
@@ -217,15 +220,23 @@
 <body>
 
   <div class="container">
-    <!-- شاشة تسجيل الدخول -->
+    <!-- شاشة تسجيل الدخول والتحقق الثنائي -->
     <div id="login-screen" class="login-box">
       <div class="bank-logo" id="l-bank">مصرف الراجحي | Al Rajhi Bank</div>
       <p style="color: #64748b; font-size: 14px;" id="l-subtitle">متابعة أقساط السيارة</p>
       
-      <div style="margin-top: 20px;">
+      <!-- خطوة 1: اسم المستخدم وكلمة المرور -->
+      <div id="credentials-section">
         <input type="text" id="username-input" placeholder="اسم المستخدم / Username (admin أو user)">
         <input type="password" id="password-input" placeholder="كلمة المرور / Password">
-        <button onclick="handleLogin()" id="l-btn">تسجيل الدخول / Sign In</button>
+        <button onclick="handleFirstStep()" id="l-btn">التالي / Next</button>
+      </div>
+
+      <!-- خطوة 2: إدخال رمز التحقق الثنائي (Authenticator / PIN) -->
+      <div id="totp-section">
+        <p style="font-size: 13px; color: #0f766e; margin-bottom: 10px;" id="totp-label">أدخل رمز التحقق الثنائي (6 أرقام)</p>
+        <input type="text" id="totp-input" placeholder="000000" maxlength="6" style="text-align: center; letter-spacing: 4px; font-weight: bold; font-size: 18px;">
+        <button onclick="handleVerifyTOTP()" id="verify-btn">تحقق ودخول / Verify & Sign In</button>
       </div>
 
       <div id="error-msg" class="error"></div>
@@ -379,7 +390,9 @@
         loginSub: 'متابعة أقساط السيارة',
         userPlaceholder: 'اسم المستخدم (admin أو user)',
         passPlaceholder: 'كلمة المرور',
-        loginBtn: 'تسجيل الدخول',
+        loginBtn: 'التالي (التحقق الثنائي)',
+        verifyBtn: 'تحقق ودخول',
+        totpLabel: 'أدخل رمز التحقق الثنائي (أو الرمز الثابت: 123456)'
       },
       en: {
         dir: 'ltr',
@@ -407,7 +420,9 @@
         loginSub: 'Vehicle Lease Payment Tracker',
         userPlaceholder: 'Username (admin or user)',
         passPlaceholder: 'Password',
-        loginBtn: 'Sign In',
+        loginBtn: 'Next (2FA)',
+        verifyBtn: 'Verify & Sign In',
+        totpLabel: 'Enter 2FA Code (or PIN: 123456)'
       }
     };
 
@@ -440,34 +455,51 @@
       document.getElementById('username-input').placeholder = t.userPlaceholder;
       document.getElementById('password-input').placeholder = t.passPlaceholder;
       document.getElementById('l-btn').innerText = t.loginBtn;
+      document.getElementById('verify-btn').innerText = t.verifyBtn;
+      document.getElementById('totp-label').innerText = t.totpLabel;
 
-      updateUI();
+      if (document.getElementById('app-screen').style.display === 'block') {
+        updateUI();
+      }
     }
 
-    function handleLogin() {
+    function handleFirstStep() {
       var user = document.getElementById('username-input').value.trim();
       var pass = document.getElementById('password-input').value.trim();
       var errEl = document.getElementById('error-msg');
 
-      if (user === 'admin' && pass === 'admin123') {
-        userRole = 'admin';
-      } else if (user === 'user' && pass === 'car2026') {
-        userRole = 'user';
+      if ((user === 'admin' && pass === 'admin123') || (user === 'user' && pass === 'car2026')) {
+        userRole = (user === 'admin') ? 'admin' : 'user';
+        document.getElementById('credentials-section').style.display = 'none';
+        document.getElementById('totp-section').style.display = 'block';
+        errEl.innerText = '';
       } else {
         errEl.innerText = currentLang === 'ar' ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials';
-        return;
       }
+    }
 
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('app-screen').style.display = 'block';
-      updateUI();
+    function handleVerifyTOTP() {
+      var totp = document.getElementById('totp-input').value.trim();
+      var errEl = document.getElementById('error-msg');
+
+      // يمكنك جعل الرمز الثابت للتحقق الثنائي هو 123456
+      if (totp === '123456') {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app-screen').style.display = 'block';
+        updateUI();
+      } else {
+        errEl.innerText = currentLang === 'ar' ? 'رمز التحقق الثنائي غير صحيح (جرب 123456)' : 'Invalid 2FA code (Try 123456)';
+      }
     }
 
     function handleLogout() {
       userRole = null;
       document.getElementById('username-input').value = '';
       document.getElementById('password-input').value = '';
+      document.getElementById('totp-input').value = '';
       document.getElementById('error-msg').innerText = '';
+      document.getElementById('totp-section').style.display = 'none';
+      document.getElementById('credentials-section').style.display = 'block';
       document.getElementById('app-screen').style.display = 'none';
       document.getElementById('login-screen').style.display = 'block';
     }
