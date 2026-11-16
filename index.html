@@ -25,55 +25,9 @@
       max-width: 950px;
       margin: 0 auto;
     }
-    .login-box {
-      background: var(--card-bg);
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-      text-align: center;
-      max-width: 400px;
-      margin: 60px auto;
-    }
-    .bank-logo {
-      font-size: 20px;
-      font-weight: bold;
-      color: var(--primary);
-      margin-bottom: 5px;
-    }
-    input[type="text"], input[type="password"] {
-      width: 100%;
-      padding: 12px;
-      margin: 10px 0;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      box-sizing: border-box;
-      font-size: 16px;
-    }
-    button {
-      background-color: var(--primary);
-      color: white;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 16px;
-      width: 100%;
-      margin-top: 10px;
-    }
-    button:hover {
-      opacity: 0.9;
-    }
-    .error {
-      color: var(--danger);
-      margin-top: 10px;
-      font-size: 14px;
-    }
-    #app-screen {
-      display: none;
-    }
     .top-bar {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-end;
       align-items: center;
       margin-bottom: 15px;
     }
@@ -85,19 +39,6 @@
       border-radius: 6px;
       cursor: pointer;
       font-size: 13px;
-      width: auto;
-      margin: 0;
-    }
-    .logout-btn {
-      background-color: #dc2626;
-      color: white;
-      border: none;
-      padding: 6px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-      width: auto;
-      margin: 0;
     }
     .header {
       text-align: center;
@@ -221,25 +162,9 @@
 <body>
 
   <div class="container">
-    <!-- شاشة تسجيل الدخول -->
-    <div id="login-screen" class="login-box">
-      <div class="bank-logo" id="l-bank">مصرف الراجحي | Al Rajhi Bank</div>
-      <p style="color: #64748b; font-size: 14px;" id="l-subtitle">متابعة أقساط السيارة</p>
-      
-      <div id="credentials-section">
-        <input type="text" id="username-input" placeholder="اسم المستخدم / Username (admin أو user)">
-        <input type="password" id="password-input" placeholder="كلمة المرور / Password">
-        <button onclick="handleLogin()" id="l-btn">تسجيل الدخول / Sign In</button>
-      </div>
-
-      <div id="error-msg" class="error"></div>
-    </div>
-
-    <!-- شاشة التطبيق الرئيسية -->
     <div id="app-screen">
       <div class="top-bar">
         <button class="lang-btn" onclick="toggleLanguage()" id="lang-toggle-btn">English</button>
-        <button class="logout-btn" onclick="handleLogout()" id="logout-text">تسجيل الخروج</button>
       </div>
       
       <div class="header">
@@ -301,7 +226,6 @@
   </div>
 
   <script>
-    // بيانات الأقساط الـ 48
     const initialInstallments = [
       { num: 1, date: '2025-03-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
       { num: 2, date: '2025-04-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
@@ -353,7 +277,6 @@
       { num: 48, date: '2029-02-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } }
     ];
 
-    let userRole = null;
     let currentLang = 'ar';
     let installments = JSON.parse(localStorage.getItem('RAJHI_INSTALLMENTS')) || initialInstallments;
 
@@ -361,7 +284,6 @@
       ar: {
         dir: 'rtl',
         langBtn: 'English',
-        logout: 'تسجيل الخروج',
         bankHeader: 'مصرف الراجحي - بوابة التمويل التأجيري',
         mainTitle: 'لوحة متابعة أقساط السيارة',
         plateLabel: 'اللوحة',
@@ -379,17 +301,11 @@
         thNote: 'ملاحظات',
         paidBadge: 'تم السداد ✓',
         overdueBadge: 'متعثر (متأخر) ⚠️',
-        pendingBadge: 'قيد الانتظار',
-        loginTitle: 'مصرف الراجحي | Al Rajhi Bank',
-        loginSub: 'متابعة أقساط السيارة',
-        userPlaceholder: 'اسم المستخدم (admin أو user)',
-        passPlaceholder: 'كلمة المرور',
-        loginBtn: 'تسجيل الدخول',
+        pendingBadge: 'قيد الانتظار'
       },
       en: {
         dir: 'ltr',
         langBtn: 'العربية',
-        logout: 'Sign Out',
         bankHeader: 'AL RAJHI BANK - FINANCE LEASE PORTAL',
         mainTitle: 'Vehicle Installment Tracker',
         plateLabel: 'Plate',
@@ -407,12 +323,7 @@
         thNote: 'Notes',
         paidBadge: 'Paid ✓',
         overdueBadge: 'Overdue ⚠️',
-        pendingBadge: 'Pending',
-        loginTitle: 'Al Rajhi Bank',
-        loginSub: 'Vehicle Lease Payment Tracker',
-        userPlaceholder: 'Username (admin or user)',
-        passPlaceholder: 'Password',
-        loginBtn: 'Sign In',
+        pendingBadge: 'Pending'
       }
     };
 
@@ -423,7 +334,6 @@
       document.getElementById('html-root').setAttribute('dir', t.dir);
       document.getElementById('html-root').setAttribute('lang', currentLang);
       document.getElementById('lang-toggle-btn').innerText = t.langBtn;
-      document.getElementById('logout-text').innerText = t.logout;
       document.getElementById('bank-header-title').innerText = t.bankHeader;
       document.getElementById('main-title').innerText = t.mainTitle;
       document.getElementById('plate-label').innerText = t.plateLabel;
@@ -440,41 +350,7 @@
       document.getElementById('th-status').innerText = t.thStatus;
       document.getElementById('th-note').innerText = t.thNote;
 
-      document.getElementById('l-bank').innerText = t.loginTitle;
-      document.getElementById('l-subtitle').innerText = t.loginSub;
-      document.getElementById('username-input').placeholder = t.userPlaceholder;
-      document.getElementById('password-input').placeholder = t.passPlaceholder;
-      document.getElementById('l-btn').innerText = t.loginBtn;
-
       updateUI();
-    }
-
-    function handleLogin() {
-      var user = document.getElementById('username-input').value.trim();
-      var pass = document.getElementById('password-input').value.trim();
-      var errEl = document.getElementById('error-msg');
-
-      if (user === 'admin' && pass === 'admin123') {
-        userRole = 'admin';
-      } else if (user === 'user' && pass === 'car2026') {
-        userRole = 'user';
-      } else {
-        errEl.innerText = currentLang === 'ar' ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials';
-        return;
-      }
-
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('app-screen').style.display = 'block';
-      updateUI();
-    }
-
-    function handleLogout() {
-      userRole = null;
-      document.getElementById('username-input').value = '';
-      document.getElementById('password-input').value = '';
-      document.getElementById('error-msg').innerText = '';
-      document.getElementById('app-screen').style.display = 'none';
-      document.getElementById('login-screen').style.display = 'block';
     }
 
     function updateUI() {
@@ -494,9 +370,6 @@
       let totalAmount = downPayment + installmentsTotal + finalPayment;
       let remainingAmount = totalAmount - paidAmount;
 
-      document.getElementById('down-payment-val').innerText = downPayment.toLocaleString() + ' SAR';
-      document.getElementById('final-payment-val').innerText = finalPayment.toLocaleString() + ' SAR';
-      document.getElementById('insurance-val').innerText = insuranceTotal.toLocaleString() + ' SAR';
       document.getElementById('total-val').innerText = totalAmount.toLocaleString() + ' SAR';
       document.getElementById('paid-val').innerText = paidAmount.toLocaleString() + ' SAR';
       document.getElementById('remaining-val').innerText = remainingAmount.toLocaleString() + ' SAR';
@@ -521,15 +394,6 @@
           statusCellHTML = `<span class="badge-pending">${t.pendingBadge}</span>`;
         }
 
-        if (userRole === 'admin') {
-          statusCellHTML = `
-            <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
-              <input type="checkbox" ${item.paid ? 'checked' : ''} onchange="togglePayment(${item.num}, this.checked)" style="transform: scale(1.2);">
-              ${statusCellHTML}
-            </label>
-          `;
-        }
-        
         var noteText = (typeof item.note === 'object') ? (item.note[currentLang] || item.note.ar) : item.note;
 
         tr.innerHTML = `
@@ -543,14 +407,10 @@
       });
     }
 
-    function togglePayment(num, isPaid) {
-      installments = installments.map(item => {
-        if (item.num === num) item.paid = isPaid;
-        return item;
-      });
-      localStorage.setItem('RAJHI_INSTALLMENTS', JSON.stringify(installments));
+    // تشغيل التحديث فور تحميل الصفحة مباشرة
+    window.onload = function() {
       updateUI();
-    }
+    };
   </script>
 </body>
 </html>
