@@ -6,8 +6,8 @@
   <title id="page-title">مصرف الراجحي - متابعة أقساط السيارة</title>
   <!-- مكتبة لتوليد الـ QR Code محلياً -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-  <!-- مكتبة لتوليد رموز TOTP الحقيقية -->
-  <script src="https://cdnjs.cloudflare.com/ajax5/libs/otpauth/9.1.4/otpauth.umd.min.js"></script>
+  <!-- مكتبة لتوليد رموز TOTP الحقيقية (تم تصحيح الرابط) -->
+  <script src="https://cdn.jsdelivr.net/npm/otpauth@9.1.4/dist/otpauth.umd.min.js"></script>
   <style>
     :root {
       --primary: #004c8f;
@@ -53,6 +53,12 @@
       box-sizing: border-box;
       font-size: 16px;
     }
+    .otp-input {
+      text-align: center;
+      letter-spacing: 4px;
+      font-weight: bold;
+      direction: ltr;
+    }
     button {
       background-color: var(--primary);
       color: white;
@@ -61,11 +67,14 @@
       border-radius: 8px;
       cursor: pointer;
       font-size: 16px;
-      width: 100%;
-      margin-top: 10px;
     }
     button:hover {
       opacity: 0.9;
+    }
+    /* العرض الكامل فقط لأزرار شاشة الدخول */
+    .login-box button {
+      width: 100%;
+      margin-top: 10px;
     }
     .error {
       color: var(--danger);
@@ -84,23 +93,21 @@
       align-items: center;
       margin-bottom: 15px;
     }
-    .lang-btn {
-      background-color: #475569;
+    .lang-btn, .logout-btn {
       color: white;
       border: none;
       padding: 6px 14px;
       border-radius: 6px;
       cursor: pointer;
       font-size: 13px;
+      width: auto;
+      margin-top: 0;
+    }
+    .lang-btn {
+      background-color: #475569;
     }
     .logout-btn {
       background-color: #dc2626;
-      color: white;
-      border: none;
-      padding: 6px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
     }
     .header {
       text-align: center;
@@ -190,34 +197,29 @@
       padding: 12px 15px;
       border-bottom: 1px solid #e2e8f0;
       font-size: 14px;
+      white-space: nowrap;
     }
     th {
       background-color: var(--primary);
       color: white;
     }
-    .badge-paid {
-      background-color: #d1fae5;
-      color: #065f46;
+    .badge-paid, .badge-overdue, .badge-pending {
       padding: 4px 10px;
       border-radius: 20px;
       font-size: 12px;
       font-weight: bold;
+    }
+    .badge-paid {
+      background-color: #d1fae5;
+      color: #065f46;
     }
     .badge-overdue {
       background-color: #fee2e2;
       color: #dc2626;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: bold;
     }
     .badge-pending {
       background-color: #fef3c7;
       color: #b45309;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: bold;
     }
     #qrcode img {
       margin: 10px auto;
@@ -235,32 +237,36 @@
     <div id="login-screen" class="login-box">
       <div class="bank-logo" id="l-bank">مصرف الراجحي | Al Rajhi Bank</div>
       <p style="color: #64748b; font-size: 14px;" id="l-subtitle">متابعة أقساط السيارة</p>
-      
+
       <!-- الخطوة 1: اليوزر والباسورد -->
       <div id="credentials-section">
-        <input type="text" id="username-input" placeholder="اسم المستخدم / Username (admin أو user)">
-        <input type="password" id="password-input" placeholder="كلمة المرور / Password">
-        <button onclick="handleLogin()" id="l-btn">تسجيل الدخول / Sign In</button>
+        <input type="text" id="username-input" placeholder="اسم المستخدم" autocomplete="username">
+        <input type="password" id="password-input" placeholder="كلمة المرور" autocomplete="current-password">
+        <button onclick="handleLogin()" id="l-btn">تسجيل الدخول</button>
       </div>
 
       <!-- الخطوة 2أ: إعداد تطبيق التحقق (QR Code) لو لم يتم ربطه من قبل -->
       <div id="totp-setup-section">
-        <p style="font-size: 13px; color: #004c8f; font-weight: bold; margin-bottom: 5px;">ربط تطبيق التحقق (Google Authenticator)</p>
-        <p style="font-size: 12px; color: #64748b; margin-bottom: 10px;">امسح رمز الاستجابة السريعة (QR) أدناه بتطبيق الـ Authenticator:</p>
+        <p style="font-size: 13px; color: #004c8f; font-weight: bold; margin-bottom: 5px;" id="setup-title">ربط تطبيق التحقق (Google Authenticator)</p>
+        <p style="font-size: 12px; color: #64748b; margin-bottom: 10px;" id="setup-desc">امسح رمز الاستجابة السريعة (QR) أدناه بتطبيق الـ Authenticator:</p>
         <div id="qrcode"></div>
-        <p style="font-size: 11px; color: #64748b; word-break: break-all;" id="secret-text"></p>
-        <input type="text" id="setup-otp-input" placeholder="أدخل الرمز (6 أرقام) للتأكيد" maxlength="6" style="text-align: center; letter-spacing: 3px; font-weight: bold;">
-        <button onclick="confirmSetupTOTP()">تأكيد وربط / Confirm & Link</button>
+        <p style="font-size: 11px; color: #64748b; word-break: break-all; direction: ltr;" id="secret-text"></p>
+        <input type="text" id="setup-otp-input" class="otp-input" placeholder="أدخل الرمز (6 أرقام) للتأكيد" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+        <button onclick="confirmSetupTOTP()" id="setup-btn">تأكيد وربط</button>
       </div>
 
-      <!-- الخطوة 2ب: إدخال رمز التطبيق الطبيعي للولوج -->
+      <!-- الخطوة 2ب: إدخال رمز التطبيق للولوج -->
       <div id="totp-verify-section">
         <p style="font-size: 13px; color: #0f766e; margin-bottom: 10px;" id="totp-label">أدخل رمز التحقق من تطبيق الـ Authenticator</p>
-        <input type="text" id="verify-otp-input" placeholder="000000" maxlength="6" style="text-align: center; letter-spacing: 4px; font-weight: bold; font-size: 18px;">
-        <button onclick="verifyTOTPLogin()">تحقق ودخول / Verify & Sign In</button>
+        <input type="text" id="verify-otp-input" class="otp-input" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="font-size: 18px;">
+        <button onclick="verifyTOTPLogin()" id="verify-btn">تحقق ودخول</button>
       </div>
 
       <div id="error-msg" class="error"></div>
+
+      <div style="margin-top: 15px;">
+        <button class="lang-btn" onclick="toggleLanguage()" id="login-lang-btn">English</button>
+      </div>
     </div>
 
     <!-- شاشة التطبيق الرئيسية -->
@@ -269,7 +275,7 @@
         <button class="lang-btn" onclick="toggleLanguage()" id="lang-toggle-btn">English</button>
         <button class="logout-btn" onclick="handleLogout()" id="logout-text">تسجيل الخروج</button>
       </div>
-      
+
       <div class="header">
         <div style="font-size: 13px; font-weight: bold; color: var(--primary); margin-bottom: 5px;" id="bank-header-title">مصرف الراجحي - بوابة التمويل التأجيري</div>
         <h1 id="main-title">لوحة متابعة أقساط السيارة</h1>
@@ -283,15 +289,15 @@
       <div class="special-box">
         <div>
           <span id="dp-label">الدفعة المقدمة</span>
-          <strong>19,171 SAR</strong>
+          <strong id="dp-val">-</strong>
         </div>
         <div>
           <span id="fp-label">الدفعة الأخيرة (الملكية)</span>
-          <strong>34,263 SAR</strong>
+          <strong id="fp-val">-</strong>
         </div>
         <div>
           <span id="ins-label">التأمين (4 سنوات @ 5,000/سنة)</span>
-          <strong>20,000 SAR</strong>
+          <strong id="ins-val">-</strong>
         </div>
       </div>
 
@@ -316,7 +322,7 @@
             <tr>
               <th id="th-num">رقم القسط</th>
               <th id="th-date">تاريخ الاستحقاق</th>
-              <th id="th-amount">المبلغ (ريال / SAR)</th>
+              <th id="th-amount">المبلغ (ر.س)</th>
               <th id="th-status">حالة السداد</th>
               <th id="th-note">ملاحظات</th>
             </tr>
@@ -329,70 +335,133 @@
   </div>
 
   <script>
-    const initialInstallments = [
-      { num: 1, date: '2025-03-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 2, date: '2025-04-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 3, date: '2025-05-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 4, date: '2025-06-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 5, date: '2025-07-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 6, date: '2025-08-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 7, date: '2025-09-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 8, date: '2025-10-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 9, date: '2025-11-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 10, date: '2025-12-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 11, date: '2026-01-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 12, date: '2026-02-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 13, date: '2026-03-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 14, date: '2026-04-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 15, date: '2026-05-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 16, date: '2026-06-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 17, date: '2026-07-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 18, date: '2026-08-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 19, date: '2026-09-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 20, date: '2026-10-01', amount: 2371.62, paid: true, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 21, date: '2026-11-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 22, date: '2026-12-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 23, date: '2027-01-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 24, date: '2027-02-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 25, date: '2027-03-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 26, date: '2027-04-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 27, date: '2027-05-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 28, date: '2027-06-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 29, date: '2027-07-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 30, date: '2027-08-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 31, date: '2027-09-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 32, date: '2027-10-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 33, date: '2027-11-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 34, date: '2027-12-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 35, date: '2028-01-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 36, date: '2028-02-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 37, date: '2028-03-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 38, date: '2028-04-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 39, date: '2028-05-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 40, date: '2028-06-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 41, date: '2028-07-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 42, date: '2028-08-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 43, date: '2028-09-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 44, date: '2028-10-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 45, date: '2028-11-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 46, date: '2028-12-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 47, date: '2029-01-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } },
-      { num: 48, date: '2029-02-01', amount: 2371.62, paid: false, note: { ar: 'قسط شهري', en: 'Monthly Installment' } }
-    ];
+    // ===================== الإعدادات =====================
+    const DOWN_PAYMENT = 19171;
+    const FINAL_PAYMENT = 34263;
+    const INSURANCE_TOTAL = 20000;
+    const MONTHLY_AMOUNT = 2371.62;
+    const FIRST_DUE = { year: 2025, month: 3 }; // أول قسط: مارس 2025
+    const INSTALLMENT_COUNT = 48;
+    const PAID_UNTIL = 20; // عدد الأقساط المسددة افتراضياً
+
+    // كلمات المرور محفوظة كـ SHA-256 بدل النص الصريح
+    // لتوليد هاش لكلمة مرور جديدة: افتح Console في المتصفح واكتب:
+    // sha256('كلمة_المرور_الجديدة').then(console.log)
+    const USERS = {
+      admin: { role: 'admin', hash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9' },
+      user:  { role: 'user',  hash: 'a507c3e81d7883414bb7b745c34e99a20bf1e9dcef35cb8b2ca26ae65a5639f4' }
+    };
+
+    // ===================== توليد جدول الأقساط =====================
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    const initialInstallments = Array.from({ length: INSTALLMENT_COUNT }, function (_, i) {
+      const totalMonths = (FIRST_DUE.month - 1) + i;
+      const y = FIRST_DUE.year + Math.floor(totalMonths / 12);
+      const m = (totalMonths % 12) + 1;
+      return {
+        num: i + 1,
+        date: y + '-' + pad(m) + '-01',
+        amount: MONTHLY_AMOUNT,
+        paid: (i + 1) <= PAID_UNTIL,
+        note: { ar: 'قسط شهري', en: 'Monthly Installment' }
+      };
+    });
+
+    // نحفظ حالة السداد فقط، والمبالغ والتواريخ تجي دايماً من الكود
+    function loadInstallments() {
+      let savedPaid = {};
+      try {
+        const saved = JSON.parse(localStorage.getItem('RAJHI_INSTALLMENTS'));
+        if (Array.isArray(saved)) {
+          saved.forEach(function (s) { savedPaid[s.num] = !!s.paid; });
+        }
+      } catch (e) {
+        savedPaid = {};
+      }
+      return initialInstallments.map(function (item) {
+        return Object.assign({}, item, {
+          paid: (item.num in savedPaid) ? savedPaid[item.num] : item.paid
+        });
+      });
+    }
+
+    function saveInstallments() {
+      try {
+        const slim = installments.map(function (i) { return { num: i.num, paid: i.paid }; });
+        localStorage.setItem('RAJHI_INSTALLMENTS', JSON.stringify(slim));
+      } catch (e) {
+        console.error('Storage error:', e);
+      }
+    }
 
     let currentUser = null;
     let userRole = null;
     let currentLang = 'ar';
-    let installments = JSON.parse(localStorage.getItem('RAJHI_INSTALLMENTS')) || initialInstallments;
+    let pendingSecret = null; // المفتاح المؤقت قبل تأكيد الربط
+    let installments = loadInstallments();
 
-    // ترجمة الواجهات
+    // ===================== أدوات مساعدة =====================
+    async function sha256(text) {
+      const data = new TextEncoder().encode(text);
+      const buf = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+    }
+
+    function formatMoney(n) {
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' SAR';
+    }
+
+    // قراءة التاريخ بالتوقيت المحلي (new Date('2025-03-01') يقرأه UTC)
+    function parseLocalDate(str) {
+      const parts = str.split('-').map(Number);
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function setError(key) {
+      document.getElementById('error-msg').innerText = key ? translations[currentLang][key] : '';
+    }
+
+    function show(id, visible) {
+      document.getElementById(id).style.display = visible ? 'block' : 'none';
+    }
+
+    function librariesReady() {
+      if (typeof OTPAuth === 'undefined' || typeof qrcode === 'undefined') {
+        setError('libError');
+        return false;
+      }
+      return true;
+    }
+
+    function getSecretKey(user) { return 'TOTP_SECRET_' + user; }
+
+    function buildTOTP(secret) {
+      return new OTPAuth.TOTP({
+        issuer: 'CarTracker',
+        label: currentUser,
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+        secret: secret
+      });
+    }
+
+    function isValidCode(secret, code) {
+      if (!/^\d{6}$/.test(code)) return false;
+      return buildTOTP(secret).validate({ token: code, window: 1 }) !== null;
+    }
+
+    // ===================== الترجمة =====================
     const translations = {
       ar: {
         dir: 'rtl',
+        pageTitle: 'مصرف الراجحي - متابعة أقساط السيارة',
         langBtn: 'English',
         logout: 'تسجيل الخروج',
         bankHeader: 'مصرف الراجحي - بوابة التمويل التأجيري',
         mainTitle: 'لوحة متابعة أقساط السيارة',
+        carName: 'تويوتا كامري 2025 (Toyota Camry)',
         plateLabel: 'اللوحة',
         auth: 'المفوض',
         dp: 'الدفعة المقدمة',
@@ -407,20 +476,33 @@
         thStatus: 'حالة السداد',
         thNote: 'ملاحظات',
         paidBadge: 'تم السداد ✓',
-        overdueBadge: 'متعثر (متأخر) ⚠️',
+        overdueBadge: 'متأخر ⚠️',
         pendingBadge: 'قيد الانتظار',
         loginTitle: 'مصرف الراجحي | Al Rajhi Bank',
         loginSub: 'متابعة أقساط السيارة',
-        userPlaceholder: 'اسم المستخدم (admin أو user)',
+        userPlaceholder: 'اسم المستخدم',
         passPlaceholder: 'كلمة المرور',
-        loginBtn: 'تسجيل الدخول'
+        loginBtn: 'تسجيل الدخول',
+        setupTitle: 'ربط تطبيق التحقق (Google Authenticator)',
+        setupDesc: 'امسح رمز الاستجابة السريعة (QR) أدناه بتطبيق الـ Authenticator:',
+        setupPlaceholder: 'أدخل الرمز (6 أرقام) للتأكيد',
+        setupBtn: 'تأكيد وربط',
+        verifyLabel: 'أدخل رمز التحقق من تطبيق الـ Authenticator',
+        verifyBtn: 'تحقق ودخول',
+        errCreds: 'اسم المستخدم أو كلمة المرور غير صحيحة',
+        errSetupCode: 'رمز التحقق غير صحيح، تأكد من التطبيق',
+        errVerifyCode: 'رمز التحقق الثنائي غير صحيح',
+        libError: 'تعذر تحميل مكتبات التحقق، تأكد من الاتصال بالإنترنت وحدّث الصفحة',
+        qrError: 'تعذر إنشاء رمز QR، استخدم المفتاح السري يدوياً'
       },
       en: {
         dir: 'ltr',
+        pageTitle: 'Al Rajhi Bank - Vehicle Installment Tracker',
         langBtn: 'العربية',
         logout: 'Sign Out',
-        bankHeader: 'AL RAJHI BANK - FINANCE LEASE PORTAL',
+        bankHeader: 'Al Rajhi Bank - Finance Lease Portal',
         mainTitle: 'Vehicle Installment Tracker',
+        carName: 'Toyota Camry 2025',
         plateLabel: 'Plate',
         auth: 'Authorized',
         dp: 'Down Payment',
@@ -439,229 +521,269 @@
         pendingBadge: 'Pending',
         loginTitle: 'Al Rajhi Bank',
         loginSub: 'Vehicle Lease Payment Tracker',
-        userPlaceholder: 'Username (admin or user)',
+        userPlaceholder: 'Username',
         passPlaceholder: 'Password',
-        loginBtn: 'Sign In'
+        loginBtn: 'Sign In',
+        setupTitle: 'Link your authenticator app (Google Authenticator)',
+        setupDesc: 'Scan the QR code below with your authenticator app:',
+        setupPlaceholder: 'Enter the 6-digit code to confirm',
+        setupBtn: 'Confirm & Link',
+        verifyLabel: 'Enter the code from your authenticator app',
+        verifyBtn: 'Verify & Sign In',
+        errCreds: 'Invalid username or password',
+        errSetupCode: 'Invalid code, check your authenticator app',
+        errVerifyCode: 'Invalid 2FA code',
+        libError: 'Could not load the verification libraries. Check your connection and refresh the page.',
+        qrError: 'Could not create the QR code. Enter the secret key manually.'
       }
     };
 
-    function toggleLanguage() {
-      currentLang = currentLang === 'ar' ? 'en' : 'ar';
-      var t = translations[currentLang];
-      
-      document.getElementById('html-root').setAttribute('dir', t.dir);
-      document.getElementById('html-root').setAttribute('lang', currentLang);
-      document.getElementById('lang-toggle-btn').innerText = t.langBtn;
-      document.getElementById('logout-text').innerText = t.logout;
-      document.getElementById('bank-header-title').innerText = t.bankHeader;
-      document.getElementById('main-title').innerText = t.mainTitle;
-      document.getElementById('plate-label').innerText = t.plateLabel;
-      document.getElementById('auth-label').innerText = t.auth;
-      document.getElementById('dp-label').innerText = t.dp;
-      document.getElementById('fp-label').innerText = t.fp;
-      document.getElementById('ins-label').innerText = t.ins;
-      document.getElementById('stat-total-label').innerText = t.tot;
-      document.getElementById('stat-paid-label').innerText = t.paid;
-      document.getElementById('stat-rem-label').innerText = t.rem;
-      document.getElementById('th-num').innerText = t.thNum;
-      document.getElementById('th-date').innerText = t.thDate;
-      document.getElementById('th-amount').innerText = t.thAmount;
-      document.getElementById('th-status').innerText = t.thStatus;
-      document.getElementById('th-note').innerText = t.thNote;
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.innerText = text;
+    }
 
-      document.getElementById('l-bank').innerText = t.loginTitle;
-      document.getElementById('l-subtitle').innerText = t.loginSub;
+    function applyLanguage() {
+      const t = translations[currentLang];
+      const root = document.getElementById('html-root');
+      root.setAttribute('dir', t.dir);
+      root.setAttribute('lang', currentLang);
+      document.title = t.pageTitle;
+
+      setText('lang-toggle-btn', t.langBtn);
+      setText('login-lang-btn', t.langBtn);
+      setText('logout-text', t.logout);
+      setText('bank-header-title', t.bankHeader);
+      setText('main-title', t.mainTitle);
+      setText('car-name', t.carName);
+      setText('plate-label', t.plateLabel);
+      setText('auth-label', t.auth);
+      setText('dp-label', t.dp);
+      setText('fp-label', t.fp);
+      setText('ins-label', t.ins);
+      setText('stat-total-label', t.tot);
+      setText('stat-paid-label', t.paid);
+      setText('stat-rem-label', t.rem);
+      setText('th-num', t.thNum);
+      setText('th-date', t.thDate);
+      setText('th-amount', t.thAmount);
+      setText('th-status', t.thStatus);
+      setText('th-note', t.thNote);
+
+      setText('l-bank', t.loginTitle);
+      setText('l-subtitle', t.loginSub);
+      setText('l-btn', t.loginBtn);
+      setText('setup-title', t.setupTitle);
+      setText('setup-desc', t.setupDesc);
+      setText('setup-btn', t.setupBtn);
+      setText('totp-label', t.verifyLabel);
+      setText('verify-btn', t.verifyBtn);
       document.getElementById('username-input').placeholder = t.userPlaceholder;
       document.getElementById('password-input').placeholder = t.passPlaceholder;
-      document.getElementById('l-btn').innerText = t.loginBtn;
+      document.getElementById('setup-otp-input').placeholder = t.setupPlaceholder;
+
+      setError('');
 
       if (document.getElementById('app-screen').style.display === 'block') {
         updateUI();
       }
     }
 
-    // الخطوة 1: التحقق من اليوزر والباسورد
-    function handleLogin() {
-      var user = document.getElementById('username-input').value.trim();
-      var pass = document.getElementById('password-input').value.trim();
-      var errEl = document.getElementById('error-msg');
-
-      if ((user === 'admin' && pass === 'admin123') || (user === 'user' && pass === 'car2026')) {
-        currentUser = user;
-        userRole = (user === 'admin') ? 'admin' : 'user';
-        errEl.innerText = '';
-
-        // التحقق هل تم تخزين مفتاح سري لتطبيق التحقق لهذا المستخدم مسبقاً؟
-        let savedSecret = localStorage.getItem('TOTP_SECRET_' + currentUser);
-        
-        document.getElementById('credentials-section').style.display = 'none';
-
-        if (!savedSecret) {
-          // إنشاء مفتاح سري جديد فريد للمستخدم
-          let secret = new OTPAuth.Secret({ size: 20 });
-          let base32Secret = secret.base32;
-          localStorage.setItem('TOTP_SECRET_' + currentUser, base32Secret);
-
-          let totp = new OTPAuth.TOTP({
-            issuer: 'AlRajhi Bank',
-            label: currentUser + '@CarTracker',
-            algorithm: 'SHA1',
-            digits: 6,
-            period: 30,
-            secret: base32Secret
-          });
-
-          // عرض الـ QR Code
-          document.getElementById('totp-setup-section').style.display = 'block';
-          document.getElementById('secret-text').innerText = 'Secret Key: ' + base32Secret;
-          
-          let qrContainer = document.getElementById('qrcode');
-          qrContainer.innerHTML = '';
-          
-          // استخدام مكتبة qrcode لتوليد الـ QR
-          let typeNumber = 4;
-          let errorCorrectionLevel = 'M';
-          let qr = qrcode(typeNumber, errorCorrectionLevel);
-          qr.addData(totp.toString());
-          qr.make();
-          qrContainer.innerHTML = qr.createHtmlTag(5);
-
-        } else {
-          // إذا كان مفرداً من قبل، اطلب منه الرمز مباشرة
-          document.getElementById('totp-verify-section').style.display = 'block';
-        }
-
-      } else {
-        errEl.innerText = currentLang === 'ar' ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid credentials';
-      }
+    function toggleLanguage() {
+      currentLang = currentLang === 'ar' ? 'en' : 'ar';
+      applyLanguage();
     }
 
-    // تأكيد إعداد الـ TOTP للمرة الأولى بعد مسح الباركود
+    // ===================== تسجيل الدخول =====================
+    async function handleLogin() {
+      const user = document.getElementById('username-input').value.trim().toLowerCase();
+      const pass = document.getElementById('password-input').value;
+
+      const account = USERS[user];
+      const passHash = await sha256(pass);
+
+      if (!account || account.hash !== passHash) {
+        setError('errCreds');
+        return;
+      }
+
+      if (!librariesReady()) return;
+
+      currentUser = user;
+      userRole = account.role;
+      setError('');
+      show('credentials-section', false);
+
+      let savedSecret = null;
+      try { savedSecret = localStorage.getItem(getSecretKey(currentUser)); } catch (e) {}
+
+      if (savedSecret) {
+        show('totp-verify-section', true);
+        document.getElementById('verify-otp-input').focus();
+        return;
+      }
+
+      // إنشاء مفتاح جديد، ولا يُحفظ إلا بعد التأكيد
+      pendingSecret = new OTPAuth.Secret({ size: 20 }).base32;
+      const totp = buildTOTP(pendingSecret);
+
+      show('totp-setup-section', true);
+      document.getElementById('secret-text').innerText = 'Secret Key: ' + pendingSecret;
+
+      const qrContainer = document.getElementById('qrcode');
+      qrContainer.innerHTML = '';
+      try {
+        // 0 = اختيار الحجم تلقائياً (الحجم 4 كان صغير على الرابط ويطلع خطأ)
+        const qr = qrcode(0, 'M');
+        qr.addData(totp.toString());
+        qr.make();
+        qrContainer.innerHTML = qr.createImgTag(5, 8);
+      } catch (e) {
+        console.error(e);
+        setError('qrError');
+      }
+      document.getElementById('setup-otp-input').focus();
+    }
+
+    // تأكيد إعداد الـ TOTP للمرة الأولى
     function confirmSetupTOTP() {
-      var code = document.getElementById('setup-otp-input').value.trim();
-      var errEl = document.getElementById('error-msg');
-      let base32Secret = localStorage.getItem('TOTP_SECRET_' + currentUser);
+      const code = document.getElementById('setup-otp-input').value.trim();
+      if (!pendingSecret || !librariesReady()) return;
 
-      let totp = new OTPAuth.TOTP({
-        secret: base32Secret
-      });
-
-      let delta = totp.validate({ token: code, window: 1 });
-      if (delta !== null) {
-        document.getElementById('totp-setup-section').style.display = 'none';
-        document.getElementById('app-screen').style.display = 'block';
-        updateUI();
+      if (isValidCode(pendingSecret, code)) {
+        try { localStorage.setItem(getSecretKey(currentUser), pendingSecret); } catch (e) {}
+        pendingSecret = null;
+        enterApp();
       } else {
-        errEl.innerText = currentLang === 'ar' ? 'رمز التحقق غير صحيح، تأكد من التطبيق' : 'Invalid code, check your authenticator app';
+        setError('errSetupCode');
       }
     }
 
-    // التحقق المعتاد من الرمز في المرات القادمة
+    // التحقق المعتاد في المرات القادمة
     function verifyTOTPLogin() {
-      var code = document.getElementById('verify-otp-input').value.trim();
-      var errEl = document.getElementById('error-msg');
-      let base32Secret = localStorage.getItem('TOTP_SECRET_' + currentUser);
+      const code = document.getElementById('verify-otp-input').value.trim();
+      if (!librariesReady()) return;
 
-      let totp = new OTPAuth.TOTP({
-        secret: base32Secret
-      });
+      let secret = null;
+      try { secret = localStorage.getItem(getSecretKey(currentUser)); } catch (e) {}
+      if (!secret) { handleLogout(); return; }
 
-      let delta = totp.validate({ token: code, window: 1 });
-      if (delta !== null) {
-        document.getElementById('totp-verify-section').style.display = 'none';
-        document.getElementById('app-screen').style.display = 'block';
-        updateUI();
+      if (isValidCode(secret, code)) {
+        enterApp();
       } else {
-        errEl.innerText = currentLang === 'ar' ? 'رمز التحقق الثنائي غير صحيح' : 'Invalid 2FA code';
+        setError('errVerifyCode');
       }
+    }
+
+    function enterApp() {
+      setError('');
+      show('totp-setup-section', false);
+      show('totp-verify-section', false);
+      show('login-screen', false);
+      show('app-screen', true);
+      updateUI();
     }
 
     function handleLogout() {
       currentUser = null;
       userRole = null;
-      document.getElementById('username-input').value = '';
-      document.getElementById('password-input').value = '';
-      document.getElementById('setup-otp-input').value = '';
-      document.getElementById('verify-otp-input').value = '';
-      document.getElementById('error-msg').innerText = '';
-      document.getElementById('totp-setup-section').style.display = 'none';
-      document.getElementById('totp-verify-section').style.display = 'none';
-      document.getElementById('credentials-section').style.display = 'block';
-      document.getElementById('app-screen').style.display = 'none';
-      document.getElementById('login-screen').style.display = 'block';
+      pendingSecret = null;
+      ['username-input', 'password-input', 'setup-otp-input', 'verify-otp-input'].forEach(function (id) {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('qrcode').innerHTML = '';
+      document.getElementById('secret-text').innerText = '';
+      setError('');
+      show('totp-setup-section', false);
+      show('totp-verify-section', false);
+      show('credentials-section', true);
+      show('app-screen', false);
+      show('login-screen', true);
     }
 
+    // ===================== عرض البيانات =====================
     function updateUI() {
-      var t = translations[currentLang];
+      const t = translations[currentLang];
 
-      let downPayment = 19171;
-      let finalPayment = 34263;
-      let insuranceTotal = 20000;
       let installmentsTotal = 0;
-      let paidAmount = 0;
-
-      installments.forEach(item => {
+      let paidInstallments = 0;
+      installments.forEach(function (item) {
         installmentsTotal += item.amount;
-        if (item.paid) paidAmount += item.amount;
+        if (item.paid) paidInstallments += item.amount;
       });
 
-      let totalAmount = downPayment + installmentsTotal + finalPayment;
-      let remainingAmount = totalAmount - paidAmount;
+      const allPaid = installments.every(function (i) { return i.paid; });
+      const totalAmount = DOWN_PAYMENT + installmentsTotal + FINAL_PAYMENT;
+      // الدفعة المقدمة مدفوعة من البداية، فتنحسب ضمن المسدد
+      const paidAmount = DOWN_PAYMENT + paidInstallments;
+      const remainingAmount = totalAmount - paidAmount;
 
-      document.getElementById('total-val').innerText = totalAmount.toLocaleString() + ' SAR';
-      document.getElementById('paid-val').innerText = paidAmount.toLocaleString() + ' SAR';
-      document.getElementById('remaining-val').innerText = remainingAmount.toLocaleString() + ' SAR';
+      setText('dp-val', formatMoney(DOWN_PAYMENT));
+      setText('fp-val', formatMoney(FINAL_PAYMENT));
+      setText('ins-val', formatMoney(INSURANCE_TOTAL));
+      setText('total-val', formatMoney(totalAmount));
+      setText('paid-val', formatMoney(paidAmount));
+      setText('remaining-val', formatMoney(remainingAmount));
 
-      var tbody = document.getElementById('table-body');
+      const tbody = document.getElementById('table-body');
       tbody.innerHTML = '';
 
-      var today = new Date();
+      const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      installments.forEach(function(item) {
-        var tr = document.createElement('tr');
-        var dueDate = new Date(item.date);
-        dueDate.setHours(0, 0, 0, 0);
+      installments.forEach(function (item) {
+        const tr = document.createElement('tr');
+        const dueDate = parseLocalDate(item.date);
 
-        var statusCellHTML = '';
+        let statusCellHTML;
         if (item.paid) {
-          statusCellHTML = `<span class="badge-paid">${t.paidBadge}</span>`;
+          statusCellHTML = '<span class="badge-paid">' + t.paidBadge + '</span>';
         } else if (dueDate < today) {
-          statusCellHTML = `<span class="badge-overdue">${t.overdueBadge}</span>`;
+          statusCellHTML = '<span class="badge-overdue">' + t.overdueBadge + '</span>';
         } else {
-          statusCellHTML = `<span class="badge-pending">${t.pendingBadge}</span>`;
+          statusCellHTML = '<span class="badge-pending">' + t.pendingBadge + '</span>';
         }
 
         if (userRole === 'admin') {
-          statusCellHTML = `
-            <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
-              <input type="checkbox" ${item.paid ? 'checked' : ''} onchange="togglePayment(${item.num}, this.checked)" style="transform: scale(1.2);">
-              ${statusCellHTML}
-            </label>
-          `;
+          statusCellHTML =
+            '<label style="cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">' +
+              '<input type="checkbox" ' + (item.paid ? 'checked' : '') +
+              ' onchange="togglePayment(' + item.num + ', this.checked)" style="transform: scale(1.2);">' +
+              statusCellHTML +
+            '</label>';
         }
-        
-        var noteText = (typeof item.note === 'object') ? (item.note[currentLang] || item.note.ar) : item.note;
 
-        tr.innerHTML = `
-          <td>${item.num}</td>
-          <td>${item.date}</td>
-          <td>${item.amount.toLocaleString()}</td>
-          <td>${statusCellHTML}</td>
-          <td>${noteText}</td>
-        `;
+        const noteText = (typeof item.note === 'object') ? (item.note[currentLang] || item.note.ar) : item.note;
+
+        tr.innerHTML =
+          '<td>' + item.num + '</td>' +
+          '<td dir="ltr">' + item.date + '</td>' +
+          '<td>' + item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+          '<td>' + statusCellHTML + '</td>' +
+          '<td>' + noteText + '</td>';
         tbody.appendChild(tr);
       });
     }
 
     function togglePayment(num, isPaid) {
-      installments = installments.map(item => {
-        if (item.num === num) item.paid = isPaid;
-        return item;
+      if (userRole !== 'admin') return;
+      installments = installments.map(function (item) {
+        return item.num === num ? Object.assign({}, item, { paid: isPaid }) : item;
       });
-      localStorage.setItem('RAJHI_INSTALLMENTS', JSON.stringify(installments));
+      saveInstallments();
       updateUI();
     }
+
+    // ===================== زر Enter =====================
+    function onEnter(id, fn) {
+      document.getElementById(id).addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') fn();
+      });
+    }
+    onEnter('username-input', handleLogin);
+    onEnter('password-input', handleLogin);
+    onEnter('setup-otp-input', confirmSetupTOTP);
+    onEnter('verify-otp-input', verifyTOTPLogin);
   </script>
 </body>
 </html>
