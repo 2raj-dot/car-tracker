@@ -81,8 +81,23 @@
       margin-top: 10px;
       font-size: 14px;
     }
-    #totp-setup-section, #totp-verify-section {
+    #totp-setup-section, #totp-verify-section, #totp-save-section {
       display: none;
+    }
+    #totp-save-code {
+      width: 100%;
+      box-sizing: border-box;
+      height: 90px;
+      font-family: monospace;
+      font-size: 12px;
+      direction: ltr;
+      padding: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      resize: none;
+    }
+    .secondary-btn {
+      background-color: #475569;
     }
     #app-screen {
       display: none;
@@ -262,6 +277,15 @@
         <button onclick="verifyTOTPLogin()" id="verify-btn">تحقق ودخول</button>
       </div>
 
+      <!-- الخطوة 3: حفظ المفتاح في الكود عشان يشتغل على كل الأجهزة -->
+      <div id="totp-save-section">
+        <p style="font-size: 13px; color: #004c8f; font-weight: bold;" id="save-title">خطوة أخيرة: ثبّت الربط على كل الأجهزة</p>
+        <p style="font-size: 12px; color: #64748b; text-align: start;" id="save-desc"></p>
+        <textarea id="totp-save-code" readonly></textarea>
+        <button onclick="copySaveCode()" id="copy-btn" class="secondary-btn">نسخ</button>
+        <button onclick="enterApp()" id="continue-btn">متابعة للوحة</button>
+      </div>
+
       <div id="error-msg" class="error"></div>
 
       <div style="margin-top: 15px;">
@@ -347,9 +371,22 @@
     // كلمات المرور محفوظة كـ SHA-256 بدل النص الصريح
     // لتوليد هاش لكلمة مرور جديدة: افتح Console في المتصفح واكتب:
     // sha256('كلمة_المرور_الجديدة').then(console.log)
+    //
+    // totpEnc: مفتاح تطبيق التحقق مشفّر بكلمة المرور.
+    // اتركه فاضي '' أول مرة، وبعد ما تربط التطبيق الصفحة بتعطيك نص تلصقه هنا وترفع الملف.
+    // بعدها كل الأجهزة تستخدم نفس المفتاح ولا يطلب QR جديد.
+    // ملاحظة: لو غيّرت كلمة المرور لازم تفضّي totpEnc وتعيد الربط.
     const USERS = {
-      admin: { role: 'admin', hash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9' },
-      user:  { role: 'user',  hash: 'a507c3e81d7883414bb7b745c34e99a20bf1e9dcef35cb8b2ca26ae65a5639f4' }
+      admin: {
+        role: 'admin',
+        hash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
+        totpEnc: ''
+      },
+      user: {
+        role: 'user',
+        hash: 'a507c3e81d7883414bb7b745c34e99a20bf1e9dcef35cb8b2ca26ae65a5639f4',
+        totpEnc: ''
+      }
     };
 
     // ===================== توليد جدول الأقساط =====================
@@ -399,7 +436,57 @@
     let userRole = null;
     let currentLang = 'ar';
     let pendingSecret = null; // المفتاح المؤقت قبل تأكيد الربط
+    let sessionPassword = null; // يبقى في الذاكرة فقط أثناء خطوات الدخول
     let installments = loadInstallments();
+
+    // ===================== تشفير مفتاح TOTP بكلمة المرور =====================
+    function toBase64(bytes) {
+      let bin = '';
+      bytes.forEach(function (b) { bin += String.fromCharCode(b); });
+      return btoa(bin);
+    }
+    function fromBase64(str) {
+      return Uint8Array.from(atob(str), function (c) { return c.charCodeAt(0); });
+    }
+
+    async function deriveKey(password, salt) {
+      const baseKey = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
+      );
+      return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: salt, iterations: 200000, hash: 'SHA-256' },
+        baseKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+    }
+
+    async function encryptSecret(secret, password) {
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const key = await deriveKey(password, salt);
+      const cipher = new Uint8Array(await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(secret)
+      ));
+      const out = new Uint8Array(salt.length + iv.length + cipher.length);
+      out.set(salt, 0);
+      out.set(iv, 16);
+      out.set(cipher, 28);
+      return toBase64(out);
+    }
+
+    async function decryptSecret(blob, password) {
+      const data = fromBase64(blob);
+      const key = await deriveKey(password, data.slice(0, 16));
+      const plain = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: data.slice(16, 28) }, key, data.slice(28)
+      );
+      return new TextDecoder().decode(plain);
+    }
+
+    // المفتاح المعتمد للمستخدم: من الكود أولاً، وإلا من هذا المتصفح
+    let activeSecret = null;
 
     // ===================== أدوات مساعدة =====================
     async function sha256(text) {
@@ -493,7 +580,13 @@
         errSetupCode: 'رمز التحقق غير صحيح، تأكد من التطبيق',
         errVerifyCode: 'رمز التحقق الثنائي غير صحيح',
         libError: 'تعذر تحميل مكتبات التحقق، تأكد من الاتصال بالإنترنت وحدّث الصفحة',
-        qrError: 'تعذر إنشاء رمز QR، استخدم المفتاح السري يدوياً'
+        qrError: 'تعذر إنشاء رمز QR، استخدم المفتاح السري يدوياً',
+        errDecrypt: 'تعذر فك مفتاح التحقق. إذا غيّرت كلمة المرور، فضّي totpEnc في الكود وأعد الربط',
+        saveTitle: 'خطوة أخيرة: ثبّت الربط على كل الأجهزة',
+        saveDesc: 'انسخ النص التالي، وفي ملف index.html على GitHub الصقه بين علامتي التنصيص في totpEnc تحت المستخدم {user}، ثم احفظ التعديل (Commit). بعدها ما راح يطلب QR جديد من أي جهاز. لين ما تسوي هذا، الربط شغال على هذا المتصفح فقط.',
+        copyBtn: 'نسخ',
+        copied: 'تم النسخ ✓',
+        continueBtn: 'متابعة للوحة'
       },
       en: {
         dir: 'ltr',
@@ -534,7 +627,13 @@
         errSetupCode: 'Invalid code, check your authenticator app',
         errVerifyCode: 'Invalid 2FA code',
         libError: 'Could not load the verification libraries. Check your connection and refresh the page.',
-        qrError: 'Could not create the QR code. Enter the secret key manually.'
+        qrError: 'Could not create the QR code. Enter the secret key manually.',
+        errDecrypt: 'Could not unlock the 2FA key. If you changed the password, clear totpEnc in the code and link again.',
+        saveTitle: 'Last step: link all your devices',
+        saveDesc: 'Copy the text below. In index.html on GitHub, paste it between the quotes of totpEnc under the user {user}, then commit. After that, no device will ask for a new QR code. Until then, the link only works in this browser.',
+        copyBtn: 'Copy',
+        copied: 'Copied ✓',
+        continueBtn: 'Continue to dashboard'
       }
     };
 
@@ -578,6 +677,10 @@
       setText('setup-btn', t.setupBtn);
       setText('totp-label', t.verifyLabel);
       setText('verify-btn', t.verifyBtn);
+      setText('save-title', t.saveTitle);
+      setText('copy-btn', t.copyBtn);
+      setText('continue-btn', t.continueBtn);
+      if (currentUser) setText('save-desc', t.saveDesc.replace('{user}', currentUser));
       document.getElementById('username-input').placeholder = t.userPlaceholder;
       document.getElementById('password-input').placeholder = t.passPlaceholder;
       document.getElementById('setup-otp-input').placeholder = t.setupPlaceholder;
@@ -611,19 +714,33 @@
 
       currentUser = user;
       userRole = account.role;
+      sessionPassword = pass;
+      activeSecret = null;
       setError('');
+
+      // 1) المفتاح المحفوظ في الكود (يشتغل على كل الأجهزة)
+      if (account.totpEnc) {
+        try {
+          activeSecret = await decryptSecret(account.totpEnc, pass);
+        } catch (e) {
+          console.error(e);
+          setError('errDecrypt');
+          return;
+        }
+      } else {
+        // 2) مفتاح محفوظ في هذا المتصفح فقط (قبل نقله للكود)
+        try { activeSecret = localStorage.getItem(getSecretKey(currentUser)); } catch (e) {}
+      }
+
       show('credentials-section', false);
 
-      let savedSecret = null;
-      try { savedSecret = localStorage.getItem(getSecretKey(currentUser)); } catch (e) {}
-
-      if (savedSecret) {
+      if (activeSecret) {
         show('totp-verify-section', true);
         document.getElementById('verify-otp-input').focus();
         return;
       }
 
-      // إنشاء مفتاح جديد، ولا يُحفظ إلا بعد التأكيد
+      // 3) أول ربط: إنشاء مفتاح جديد، ولا يُحفظ إلا بعد التأكيد
       pendingSecret = new OTPAuth.Secret({ size: 20 }).base32;
       const totp = buildTOTP(pendingSecret);
 
@@ -633,7 +750,6 @@
       const qrContainer = document.getElementById('qrcode');
       qrContainer.innerHTML = '';
       try {
-        // 0 = اختيار الحجم تلقائياً (الحجم 4 كان صغير على الرابط ويطلع خطأ)
         const qr = qrcode(0, 'M');
         qr.addData(totp.toString());
         qr.make();
@@ -646,39 +762,74 @@
     }
 
     // تأكيد إعداد الـ TOTP للمرة الأولى
-    function confirmSetupTOTP() {
+    async function confirmSetupTOTP() {
       const code = document.getElementById('setup-otp-input').value.trim();
       if (!pendingSecret || !librariesReady()) return;
 
       if (isValidCode(pendingSecret, code)) {
         try { localStorage.setItem(getSecretKey(currentUser), pendingSecret); } catch (e) {}
+        activeSecret = pendingSecret;
         pendingSecret = null;
-        enterApp();
+        show('totp-setup-section', false);
+        await afterVerified();
       } else {
         setError('errSetupCode');
       }
     }
 
     // التحقق المعتاد في المرات القادمة
-    function verifyTOTPLogin() {
+    async function verifyTOTPLogin() {
       const code = document.getElementById('verify-otp-input').value.trim();
       if (!librariesReady()) return;
+      if (!activeSecret) { handleLogout(); return; }
 
-      let secret = null;
-      try { secret = localStorage.getItem(getSecretKey(currentUser)); } catch (e) {}
-      if (!secret) { handleLogout(); return; }
-
-      if (isValidCode(secret, code)) {
-        enterApp();
+      if (isValidCode(activeSecret, code)) {
+        show('totp-verify-section', false);
+        await afterVerified();
       } else {
         setError('errVerifyCode');
       }
     }
 
+    // بعد نجاح الرمز: لو المفتاح مو محفوظ في الكود، نعطيه النص اللي يلصقه
+    async function afterVerified() {
+      setError('');
+      const account = USERS[currentUser];
+      if (account.totpEnc) {
+        enterApp();
+        return;
+      }
+      try {
+        const enc = await encryptSecret(activeSecret, sessionPassword);
+        const t = translations[currentLang];
+        document.getElementById('save-desc').innerText = t.saveDesc.replace('{user}', currentUser);
+        document.getElementById('totp-save-code').value = enc;
+        show('totp-save-section', true);
+      } catch (e) {
+        console.error(e);
+        enterApp();
+      }
+    }
+
+    function copySaveCode() {
+      const box = document.getElementById('totp-save-code');
+      const t = translations[currentLang];
+      const done = function () { setText('copy-btn', t.copied); };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(box.value).then(done).catch(function () {
+          box.select(); document.execCommand('copy'); done();
+        });
+      } else {
+        box.select(); document.execCommand('copy'); done();
+      }
+    }
+
     function enterApp() {
       setError('');
+      sessionPassword = null;
       show('totp-setup-section', false);
       show('totp-verify-section', false);
+      show('totp-save-section', false);
       show('login-screen', false);
       show('app-screen', true);
       updateUI();
@@ -688,6 +839,10 @@
       currentUser = null;
       userRole = null;
       pendingSecret = null;
+      sessionPassword = null;
+      activeSecret = null;
+      show('totp-save-section', false);
+      document.getElementById('totp-save-code').value = '';
       ['username-input', 'password-input', 'setup-otp-input', 'verify-otp-input'].forEach(function (id) {
         document.getElementById(id).value = '';
       });
