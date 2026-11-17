@@ -197,6 +197,16 @@
       font-size: 15px;
       color: #1e3a8a;
     }
+    .insurance-note {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+      padding: 12px 15px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-bottom: 25px;
+      text-align: center;
+    }
     .table-container {
       background: var(--card-bg);
       border-radius: 12px;
@@ -319,10 +329,6 @@
           <span id="fp-label">الدفعة الأخيرة (الملكية)</span>
           <strong id="fp-val">-</strong>
         </div>
-        <div>
-          <span id="ins-label">التأمين (4 سنوات @ 5,000/سنة)</span>
-          <strong id="ins-val">-</strong>
-        </div>
       </div>
 
       <div class="stats-grid">
@@ -339,6 +345,8 @@
           <div class="value" id="remaining-val">-</div>
         </div>
       </div>
+
+      <div class="insurance-note" id="ins-note">ℹ️ إجمالي العقد شامل التأمين: 20,000 ريال لمدة 4 سنوات (5,000 ريال سنوياً)</div>
 
       <div class="table-container">
         <table>
@@ -362,7 +370,7 @@
     // ===================== الإعدادات =====================
     const DOWN_PAYMENT = 19171;
     const FINAL_PAYMENT = 34263;
-    const INSURANCE_TOTAL = 20000;
+    const INSURANCE_TOTAL = 20000; // للعرض فقط (داخل ضمن الأقساط)، ما ينضاف للحساب
     const MONTHLY_AMOUNT = 2371.62;
     const FIRST_DUE = { year: 2025, month: 3 }; // أول قسط: مارس 2025
     const INSTALLMENT_COUNT = 48;
@@ -553,7 +561,7 @@
         auth: 'المفوض',
         dp: 'الدفعة المقدمة',
         fp: 'الدفعة الأخيرة (الملكية)',
-        ins: 'التأمين (4 سنوات @ 5,000/سنة)',
+        insNote: 'ℹ️ إجمالي العقد شامل التأمين: {amount} ريال لمدة 4 سنوات (5,000 ريال سنوياً)',
         tot: 'إجمالي العقد الكامل',
         paid: 'المبلغ المسدد',
         rem: 'المبلغ المتبقي',
@@ -600,7 +608,7 @@
         auth: 'Authorized',
         dp: 'Down Payment',
         fp: 'Final Balloon Payment',
-        ins: 'Insurance (4 Yrs @ 5K/Yr)',
+        insNote: 'ℹ️ The total contract value includes insurance: {amount} SAR over 4 years (5,000 SAR per year)',
         tot: 'Total Contract Value',
         paid: 'Total Paid',
         rem: 'Remaining Balance',
@@ -659,7 +667,7 @@
       setText('auth-label', t.auth);
       setText('dp-label', t.dp);
       setText('fp-label', t.fp);
-      setText('ins-label', t.ins);
+      setText('ins-note', t.insNote.replace('{amount}', INSURANCE_TOTAL.toLocaleString('en-US')));
       setText('stat-total-label', t.tot);
       setText('stat-paid-label', t.paid);
       setText('stat-rem-label', t.rem);
@@ -875,7 +883,6 @@
 
       setText('dp-val', formatMoney(DOWN_PAYMENT));
       setText('fp-val', formatMoney(FINAL_PAYMENT));
-      setText('ins-val', formatMoney(INSURANCE_TOTAL));
       setText('total-val', formatMoney(totalAmount));
       setText('paid-val', formatMoney(paidAmount));
       setText('remaining-val', formatMoney(remainingAmount));
